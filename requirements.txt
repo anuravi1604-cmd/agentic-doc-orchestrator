@@ -1,0 +1,8 @@
+numpy
+pandas
+scikit-learn
+
+# Optional: enables real Claude-powered SQL drafting and answer synthesis.
+# Without this installed (or without ANTHROPIC_API_KEY set), the project
+# falls back to deterministic logic and still runs end-to-end offline.
+anthropic
