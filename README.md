@@ -114,3 +114,19 @@ left untouched.
 - Extending existing hybrid-retrieval and Text-to-SQL work into an explicit
   agentic architecture
 - Offline-first design with an optional real-LLM path for production use
+
+## 🐳 Docker Containerization
+
+Run the orchestrator and all MCP agents inside a containerized sandbox:
+
+```bash
+# Build and execute the multi-agent orchestrator via Docker Compose
+docker compose up --build
+```
+
+Or build and run directly with Docker:
+
+```bash
+docker build -t agentic-doc-orchestrator .
+docker run --rm agentic-doc-orchestrator
+```

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentic_doc_orchestrator
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Optional: pass ANTHROPIC_API_KEY from host if present
+    # environment:
+    #   - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: "no"
