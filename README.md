@@ -1,6 +1,6 @@
 # Agentic Document Orchestrator
 
-A production-grade multi-agent document intelligence system built on the **Model Context Protocol (MCP 2024-11-05)**, a decoupled team of autonomous agents, dynamic Text-to-SQL generation, hybrid retrieval with Reciprocal Rank Fusion, a REST API powered by **FastAPI**, and production **Docker** containerization.
+A multi-agent document intelligence system built on the **Model Context Protocol (MCP 2024-11-05)**, a decoupled team of agents, dynamic Text-to-SQL generation, hybrid retrieval with Reciprocal Rank Fusion, a REST API powered by **FastAPI**, and **Docker** containerization.
 
 ---
 
@@ -10,8 +10,8 @@ A production-grade multi-agent document intelligence system built on the **Model
 - 🔌 **Spec-Compliant MCP Server**: Hand-rolled JSON-RPC 2.0 stdio server strictly adhering to the MCP 2024-11-05 specification with standard content blocks (`{"content": [{"type": "text", ...}]}`) and initialization handshake.
 - 📜 **Dynamic Agent Skills**: Agents dynamically load and parse operational guidelines, procedures, and safety rules from `skills/document_qa_skill.md`.
 - ⚡ **Dynamic NL-to-SQL Generator**: Parses natural language questions into valid SQL queries (aggregations, regional/quarterly filters, grouping, and ordering) across an expanded 32-row database spanning 2025–2026.
-- 🔍 **Hybrid Document Retrieval**: Combines word-level TF-IDF (with sublinear frequency saturation approximating BM25) and sub-word character n-grams (handling acronyms, codes like `Sev-1`, and suffixes) merged via **Reciprocal Rank Fusion (RRF)** over 25 enterprise policy documents.
-- 🚀 **Production FastAPI Service**: Exposes REST endpoints (`/ask`, `/tools`, `/health`, `/eval`) with interactive Swagger UI (`/docs`).
+- 🔍 **Hybrid Document Retrieval**: Combines word-level TF-IDF (with sublinear frequency saturation approximating BM25) and sub-word character n-grams (handling acronyms, codes like `Sev-1`, and suffixes) merged via **Reciprocal Rank Fusion (RRF)** over 25 policy and engineering runbook documents.
+- 🚀 **FastAPI Service**: Exposes REST endpoints (`/ask`, `/tools`, `/health`, `/eval`) with interactive Swagger UI (`/docs`).
 - 🐳 **Docker & Docker Compose**: Sandboxed containerization exposing port `8000` with non-root security and automated container health checks.
 - 🛡️ **Defensive SQL Security**: Enforces single-statement `SELECT`, blocks write/DDL keywords, and connects via SQLite read-only URI mode (`?mode=ro`).
 - 🌐 **Offline-First with Optional LLM**: Operates 100% offline with zero external API dependencies. When `ANTHROPIC_API_KEY` is provided, agents automatically leverage Claude (`claude-sonnet-4-6`) for advanced zero-shot routing and synthesis.
@@ -87,7 +87,7 @@ A production-grade multi-agent document intelligence system built on the **Model
 │   └── document_qa_skill.md    # Agent skill definition with frontmatter & guidelines
 ├── data/
 │   ├── sample.db               # SQLite database with 32 records (2025-2026, 4 regions)
-│   └── sample_docs.jsonl       # 25 enterprise policy & engineering runbook documents
+│   └── sample_docs.jsonl       # 25 policy & engineering runbook documents
 ├── evaluation/
 │   └── eval_routing.py         # 24-case benchmark testing intent routing & tricky edge cases
 └── tests/
@@ -224,7 +224,7 @@ Run the automated test suite covering MCP communication, SQL safety, skill loadi
 python3 -m pytest tests/test_orchestrator.py -v
 ```
 
-Run the 24-case intent routing benchmark:
+Run the 24-case intent routing benchmark (24 test cases):
 
 ```bash
 python3 -m evaluation.eval_routing
@@ -239,7 +239,7 @@ curl http://localhost:8000/eval
 
 ## Security
 
-The SQL tool uses defensive hardening against malicious or hallucinated LLM outputs:
+The SQL tool uses defensive hardening against unsafe or hallucinated LLM-generated SQL:
 1. Rejects any statement not beginning with `SELECT`.
 2. Scans the full query string for prohibited DDL/DML keywords (`DROP`, `DELETE`, `INSERT`, `UPDATE`, `ALTER`, `ATTACH`, `PRAGMA`).
 3. Rejects statement chaining (`SELECT ...; DROP ...`).
