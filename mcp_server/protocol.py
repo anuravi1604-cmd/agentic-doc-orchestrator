@@ -1,34 +1,34 @@
 """
 protocol.py
 -----------
-Minimal, spec-faithful implementation of the Model Context Protocol (MCP)
-message layer, built directly on JSON-RPC 2.0 (https://www.jsonrpc.org/specification),
-which is what MCP uses under the hood.
+Spec-compliant implementation of the Model Context Protocol (MCP) message layer
+(2024-11-05 specification), built directly on JSON-RPC 2.0.
 
-We implement this by hand (instead of depending on the official `mcp` SDK)
-so the project has zero external runtime dependencies and can run fully
-offline -- but the wire format below matches the real spec:
+Wire format:
+    Request:      {"jsonrpc": "2.0", "id": <int>, "method": <str>, "params": {...}}
+    Response:     {"jsonrpc": "2.0", "id": <int>, "result": {...}}
+    Notification: {"jsonrpc": "2.0", "method": <str>, "params": {...}}
+    Error:        {"jsonrpc": "2.0", "id": <int>, "error": {"code": int, "message": str}}
 
-    Request:  {"jsonrpc": "2.0", "id": <int>, "method": <str>, "params": {...}}
-    Response: {"jsonrpc": "2.0", "id": <int>, "result": {...}}
-    Error:    {"jsonrpc": "2.0", "id": <int>, "error": {"code": int, "message": str}}
-
-Methods implemented by our server (mirrors the real MCP lifecycle):
-    initialize      -> capability negotiation / handshake
-    tools/list      -> returns the tool registry (name, description, JSON schema)
-    tools/call      -> invokes a tool by name with arguments, returns a result
-
-This is the same shape a client (an LLM-driven agent, or Claude Desktop /
-Claude Code itself) would use to discover and call tools over MCP.
+Tools/Call Response according to MCP specification:
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "<json or formatted string>"
+        }
+      ],
+      "isError": false
+    }
 """
 
 from __future__ import annotations
 import json
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
-
+from typing import Any, Callable, Dict, List, Optional, Union
 
 JSONRPC_VERSION = "2.0"
+PROTOCOL_VERSION = "2024-11-05"
 
 
 class MCPError(Exception):
@@ -40,7 +40,7 @@ class MCPError(Exception):
         self.message = message
 
 
-# Standard JSON-RPC error codes we make use of.
+# Standard JSON-RPC error codes
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
 METHOD_NOT_FOUND = -32601
@@ -55,10 +55,10 @@ class ToolSpec:
     name: str
     description: str
     input_schema: Dict[str, Any]
-    handler: Callable[[Dict[str, Any]], Dict[str, Any]] = field(repr=False)
+    handler: Callable[[Dict[str, Any]], Any] = field(repr=False)
 
     def to_public_dict(self) -> Dict[str, Any]:
-        """What we hand back over tools/list -- never expose the handler."""
+        """Exposed over tools/list according to MCP schema."""
         return {
             "name": self.name,
             "description": self.description,
@@ -66,11 +66,29 @@ class ToolSpec:
         }
 
 
-def make_response(request_id: Optional[int], result: Any) -> Dict[str, Any]:
+def format_tool_content(data: Any, is_error: bool = False) -> Dict[str, Any]:
+    """Wraps output in standard MCP tool call response format."""
+    if isinstance(data, str):
+        text_content = data
+    else:
+        text_content = json.dumps(data, ensure_ascii=False)
+
+    return {
+        "content": [
+            {
+                "type": "text",
+                "text": text_content,
+            }
+        ],
+        "isError": is_error,
+    }
+
+
+def make_response(request_id: Optional[Union[int, str]], result: Any) -> Dict[str, Any]:
     return {"jsonrpc": JSONRPC_VERSION, "id": request_id, "result": result}
 
 
-def make_error(request_id: Optional[int], code: int, message: str) -> Dict[str, Any]:
+def make_error(request_id: Optional[Union[int, str]], code: int, message: str) -> Dict[str, Any]:
     return {
         "jsonrpc": JSONRPC_VERSION,
         "id": request_id,

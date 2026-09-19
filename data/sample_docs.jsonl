@@ -1,5 +1,25 @@
 {"id": "doc_1", "text": "The company's remote work policy allows employees to work from home up to three days per week, subject to manager approval and team coverage requirements."}
-{"id": "doc_2", "text": "Our data retention policy requires that customer records be archived for seven years and then permanently deleted unless legal hold applies."}
+{"id": "doc_2", "text": "Our data retention policy requires that customer records be archived for seven years and then permanently deleted unless a legal hold applies."}
 {"id": "doc_3", "text": "Onboarding for new engineering hires includes a two-week ramp-up period covering codebase architecture, deployment pipelines, and on-call rotation training."}
-{"id": "doc_4", "text": "The incident response runbook specifies that any Sev-1 outage must be acknowledged within five minutes and a postmortem published within 48 hours."}
-{"id": "doc_5", "text": "Expense reimbursement requires itemized receipts for any purchase above twenty five dollars, submitted within thirty days of the expense date."}
+{"id": "doc_4", "text": "The incident response runbook specifies that any Sev-1 outage must be acknowledged within five minutes and an incident commander assigned immediately. A postmortem must be published within 48 hours."}
+{"id": "doc_5", "text": "Expense reimbursement requires itemized receipts for any purchase above twenty-five dollars, submitted within thirty days of the expense date via the finance portal."}
+{"id": "doc_6", "text": "Annual performance reviews occur during November and December. Self-assessments are submitted first, followed by peer feedback and manager evaluations."}
+{"id": "doc_7", "text": "Security policy mandates multi-factor authentication (MFA) on all corporate accounts, hardware-based security keys for production access, and password rotations every 90 days."}
+{"id": "doc_8", "text": "Code review standards require at least two approvals from senior engineers for any PR affecting billing, authentication, or database schemas, with a 24-hour SLA."}
+{"id": "doc_9", "text": "The travel policy covers economy flights for domestic trips under six hours and business class for international flights exceeding eight continuous hours."}
+{"id": "doc_10", "text": "Disaster recovery guidelines require automated daily database backups replicated across multiple availability zones, with a Recovery Point Objective (RPO) of 1 hour and RTO of 4 hours."}
+{"id": "doc_11", "text": "The employee referral bonus pays $3,000 for standard engineering roles and $5,000 for principal and director-level appointments, paid after 90 days of tenure."}
+{"id": "doc_12", "text": "Health and wellness benefits include comprehensive medical, dental, and vision insurance with 100% employer-covered premiums for full-time employees and 80% for dependents."}
+{"id": "doc_13", "text": "The open-source contribution policy permits employees to contribute to external projects on personal time, provided no proprietary intellectual property or customer data is shared."}
+{"id": "doc_14", "text": "Production deployments follow a continuous deployment model gated by automated integration tests, canary verification over 30 minutes, and automatic rollbacks on error budget breach."}
+{"id": "doc_15", "text": "The equipment stipend provides up to $1,000 every two years for remote office ergonomic equipment, monitors, and peripherals upon manager sign-off."}
+{"id": "doc_16", "text": "Parental leave offers 16 weeks of fully paid leave for all new parents, applicable to birth, adoption, or foster placement within the first 12 months."}
+{"id": "doc_17", "text": "API versioning policy enforces semantic versioning with at least six months deprecation notice before breaking changes are removed in major releases."}
+{"id": "doc_18", "text": "The whistleblower policy provides confidential, anonymous reporting channels for ethical, financial, or workplace safety violations with zero tolerance for retaliation."}
+{"id": "doc_19", "text": "Customer service SLAs guarantee a 15-minute first response time for Enterprise tier tickets and 2 hours for Standard tier tickets during business hours."}
+{"id": "doc_20", "text": "The corporate sustainability initiative aims for net-zero carbon emissions across all cloud data center operations by 2028 through renewable energy credits."}
+{"id": "doc_21", "text": "Severance guidelines outline two weeks of base salary per full year of completed service, with a minimum of four weeks and continuation of health coverage."}
+{"id": "doc_22", "text": "Intellectual property agreements assign all inventions, patents, and designs created during work hours or using company resources directly to the company."}
+{"id": "doc_23", "text": "The vulnerability disclosure program invites external security researchers to report vulnerabilities through our security portal with safe harbor protections and bounty awards."}
+{"id": "doc_24", "text": "Conference sponsorship allows full-time staff up to $2,500 annually for professional development, speaking engagements, or technical conference attendance."}
+{"id": "doc_25", "text": "Offboarding procedures require immediate revocation of OAuth tokens, retrieval of company laptops within 5 business days, and knowledge transfer documentation."}

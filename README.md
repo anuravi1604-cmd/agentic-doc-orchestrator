@@ -1,132 +1,248 @@
 # Agentic Document Orchestrator
 
-A multi-agent system for answering questions over a mix of unstructured
-documents and structured tabular data, built on a real **Model Context
-Protocol (MCP) server** and a small team of cooperating agents that
-discover and call tools only through the MCP protocol boundary.
+A production-grade multi-agent document intelligence system built on the **Model Context Protocol (MCP 2024-11-05)**, a decoupled team of autonomous agents, dynamic Text-to-SQL generation, hybrid retrieval with Reciprocal Rank Fusion, a REST API powered by **FastAPI**, and production **Docker** containerization.
 
-This project extends the retrieval + Text-to-SQL routing ideas from
-[ContextIQ](https://github.com/anuravi1604-cmd) into an explicit
-tool-calling, multi-agent architecture: a **Router Agent** decides which
-specialist should handle a question, hands off to a **Retrieval Agent** or
-**SQL Agent**, and a **Synthesis Agent** produces the final answer — with
-every agent talking to tools exclusively over MCP, not direct function
-calls.
+---
 
-## Why MCP, hand-rolled
+## Key Features
 
-Rather than depending on the official `mcp` SDK, the protocol layer here
-(`mcp_server/protocol.py`) is implemented directly against the JSON-RPC 2.0
-spec that MCP is built on — newline-delimited JSON-RPC messages over
-stdio, with `initialize`, `tools/list`, and `tools/call` methods. This
-keeps the project dependency-free and fully runnable offline, while still
-matching the real wire protocol a client like Claude Desktop or Claude Code
-would use to talk to any MCP server.
+- 🤖 **Decoupled Multi-Agent Architecture**: Dedicated `RouterAgent`, `SQLAgent`, `RetrievalAgent`, and `SynthesisAgent` with explicit interfaces and execution tracing.
+- 🔌 **Spec-Compliant MCP Server**: Hand-rolled JSON-RPC 2.0 stdio server strictly adhering to the MCP 2024-11-05 specification with standard content blocks (`{"content": [{"type": "text", ...}]}`) and initialization handshake.
+- 📜 **Dynamic Agent Skills**: Agents dynamically load and parse operational guidelines, procedures, and safety rules from `skills/document_qa_skill.md`.
+- ⚡ **Dynamic NL-to-SQL Generator**: Parses natural language questions into valid SQL queries (aggregations, regional/quarterly filters, grouping, and ordering) across an expanded 32-row database spanning 2025–2026.
+- 🔍 **Hybrid Document Retrieval**: Combines word-level TF-IDF (with sublinear frequency saturation approximating BM25) and sub-word character n-grams (handling acronyms, codes like `Sev-1`, and suffixes) merged via **Reciprocal Rank Fusion (RRF)** over 25 enterprise policy documents.
+- 🚀 **Production FastAPI Service**: Exposes REST endpoints (`/ask`, `/tools`, `/health`, `/eval`) with interactive Swagger UI (`/docs`).
+- 🐳 **Docker & Docker Compose**: Sandboxed containerization exposing port `8000` with non-root security and automated container health checks.
+- 🛡️ **Defensive SQL Security**: Enforces single-statement `SELECT`, blocks write/DDL keywords, and connects via SQLite read-only URI mode (`?mode=ro`).
+- 🌐 **Offline-First with Optional LLM**: Operates 100% offline with zero external API dependencies. When `ANTHROPIC_API_KEY` is provided, agents automatically leverage Claude (`claude-sonnet-4-6`) for advanced zero-shot routing and synthesis.
+
+---
 
 ## Architecture
 
 ```
-main.py
-  └── spawns mcp_server/server.py as a subprocess (MCP server, stdio transport)
-  └── agents/mcp_client.py talks to it over JSON-RPC 2.0
-
-agents/orchestrator.py
-  ├── RouterAgent      -> calls `classify_document` tool
-  ├── RetrievalAgent   -> calls `semantic_search` tool
-  ├── SQLAgent         -> drafts SQL, calls `sql_query` tool
-  └── SynthesisAgent   -> composes the final answer
-
-mcp_server/
-  ├── protocol.py       -> JSON-RPC 2.0 message types (spec-compliant)
-  ├── server.py         -> tool registry + dispatch loop
-  ├── retrieval_tool.py -> hybrid TF-IDF + char-ngram search (BM25/BGE-style fusion)
-  └── sql_tool.py       -> safe, read-only SQL execution + routing heuristic
-
-skills/document_qa_skill.md -> an agent-skill definition (markdown
-                                instructions an agent loads to know how
-                                and when to use these tools)
-
-evaluation/eval_routing.py -> benchmarks the Router Agent's tool-selection
-                              accuracy (8/8 on the included test set)
+                       User / Client Request
+                     (CLI or FastAPI /ask)
+                               │
+                               ▼
+                   DocumentAgentOrchestrator
+                               │
+            ┌──────────────────┴──────────────────┐
+            ▼                                     ▼
+       SkillLoader                          RouterAgent
+ (loads document_qa_skill.md)              (classifies intent)
+                                                  │
+                         ┌────────────────────────┴────────────────────────┐
+                         ▼                                                 ▼
+                     SQLAgent                                        RetrievalAgent
+            (dynamic SQL generator)                               (hybrid query planner)
+                         │                                                 │
+                         └────────────────────────┬────────────────────────┘
+                                                  │
+                                                  ▼
+                                              MCPClient
+                                     (JSON-RPC 2.0 over stdio)
+                                                  │
+══════════════════════════════════════════════════╪══════════════════════════════════════════
+                                    MCP Protocol Boundary
+══════════════════════════════════════════════════╪══════════════════════════════════════════
+                                                  │
+                                                  ▼
+                                    DocumentIntelligenceMCPServer
+                                   (mcp_server/server.py subprocess)
+                                                  │
+                         ┌────────────────────────┼────────────────────────┐
+                         ▼                        ▼                        ▼
+                classify_document             sql_query             semantic_search
+               (intent classifier)       (read-only SQLite)      (hybrid TF-IDF + RRF)
+                                                  │
+══════════════════════════════════════════════════╪══════════════════════════════════════════
+                                                  │
+                                                  ▼
+                                            SynthesisAgent
+                                (grounded natural-language answer)
 ```
 
-## Tools exposed over MCP
+---
 
-| Tool | Purpose |
-|---|---|
-| `classify_document` | Routes a question to `sql_query` or `semantic_search` based on whether it's structured/numeric or descriptive |
-| `semantic_search` | Hybrid lexical (word TF-IDF) + sub-word (char n-gram) search, fused the same way ContextIQ blends BM25 + dense embeddings |
-| `sql_query` | Executes a single, validated **read-only** SELECT against a sample SQLite table — rejects writes, DDL, and chained statements |
+## Directory Structure
 
-## Running it
+```
+├── Dockerfile                  # Production container image with health check
+├── docker-compose.yml          # Multi-container orchestration (ports 8000:8000)
+├── requirements.txt            # Project dependencies (FastAPI, Uvicorn, Scikit-Learn)
+├── main.py                     # CLI entrypoint for interactive questions & demo runs
+├── api.py                      # FastAPI REST application exposing /ask, /tools, /health, /eval
+├── agents/
+│   ├── orchestrator.py         # Real Agent implementations & orchestrator coordinator
+│   ├── mcp_client.py           # Spec-compliant MCP stdio client
+│   ├── sql_generator.py        # Dynamic Natural Language-to-SQL compiler
+│   └── skill_loader.py         # Markdown agent skill parser and prompt injector
+├── mcp_server/
+│   ├── protocol.py             # JSON-RPC 2.0 & MCP 2024-11-05 spec data types
+│   ├── server.py               # MCP server dispatch loop and tool registry
+│   ├── retrieval_tool.py       # Hybrid TF-IDF + char n-gram with Reciprocal Rank Fusion
+│   └── sql_tool.py             # Safe read-only SQLite execution and routing engine
+├── skills/
+│   └── document_qa_skill.md    # Agent skill definition with frontmatter & guidelines
+├── data/
+│   ├── sample.db               # SQLite database with 32 records (2025-2026, 4 regions)
+│   └── sample_docs.jsonl       # 25 enterprise policy & engineering runbook documents
+├── evaluation/
+│   └── eval_routing.py         # 24-case benchmark testing intent routing & tricky edge cases
+└── tests/
+    └── test_orchestrator.py    # Automated test suite (pytest) covering agents, tools & API
+```
+
+---
+
+## Tools Exposed Over MCP
+
+| Tool | Parameters | Description |
+|---|---|---|
+| `classify_document` | `question: string` | Classifies query intent between structured data (`sql_query`) and text docs (`semantic_search`). |
+| `semantic_search` | `query: string`, `top_k: int` | Hybrid lexical and sub-word passage retrieval with Reciprocal Rank Fusion (RRF). |
+| `sql_query` | `sql: string` | Validates and executes a single read-only `SELECT` query against `quarterly_revenue`. |
+
+---
+
+## Quickstart
+
+### 1. Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/anuravi1604-cmd/agentic-doc-orchestrator.git
+cd agentic-doc-orchestrator
+
+# Install dependencies
 pip install -r requirements.txt
-
-# Ask a specific question
-python main.py "What was the total revenue across all quarters?"
-python main.py "What is the remote work policy?"
-
-# Or run the built-in demo set
-python main.py
-
-# Run the routing accuracy benchmark
-python -m evaluation.eval_routing
 ```
 
-No API key is required — the SQL-drafting and answer-synthesis steps fall
-back to deterministic logic when `ANTHROPIC_API_KEY` isn't set, so the full
-pipeline runs end-to-end offline. Set `ANTHROPIC_API_KEY` (and
-`pip install anthropic`) to have the SQLAgent and SynthesisAgent use Claude
-for SQL drafting and answer generation instead.
-
-## Sample output
-
-```
-Q: What was the total revenue across all quarters?
-
-Agent trace:
-  [RouterAgent] classify_document: routed to 'sql_query' -- Question references numeric/aggregate terms
-  [SQLAgent] draft_sql: SELECT SUM(revenue) AS total_revenue FROM quarterly_revenue;
-  [SQLAgent] sql_query: 1 row(s) returned
-  [SynthesisAgent] synthesize: final answer composed
-
-Route chosen: sql_query
-Answer: Based on the structured data: total_revenue=20400000.0
-```
-
-## Safety
-
-The SQL tool is defensively hardened against an LLM (or a malicious prompt)
-attempting to escalate to a write: it rejects any statement that isn't a
-single `SELECT`, blocks write/DDL keywords anywhere in the query string
-(not just the first token), rejects chained statements, and opens the
-SQLite connection in strict read-only mode as a second line of defense.
-Verified with adversarial inputs (`DROP TABLE`, chained `SELECT; DELETE`)
-during development — both correctly rejected with the underlying table
-left untouched.
-
-## What this demonstrates
-
-- Real MCP protocol implementation (JSON-RPC 2.0 over stdio), not a toy simulation
-- Multi-agent orchestration with clear role separation and hand-offs
-- Tool-calling / agent-skill patterns (see `skills/document_qa_skill.md`)
-- Extending existing hybrid-retrieval and Text-to-SQL work into an explicit
-  agentic architecture
-- Offline-first design with an optional real-LLM path for production use
-
-## 🐳 Docker Containerization
-
-Run the orchestrator and all MCP agents inside a containerized sandbox:
+### 2. CLI Execution
 
 ```bash
-# Build and execute the multi-agent orchestrator via Docker Compose
+# Run the built-in demo questions
+python3 main.py
+
+# Query structured tabular data
+python3 main.py "What was the total revenue in Q1 2026?"
+python3 main.py "Which region had the highest revenue?"
+
+# Query unstructured policy documents
+python3 main.py "What is the remote work policy?"
+python3 main.py "How many days can I work remotely?"
+```
+
+### 3. FastAPI REST Service
+
+Start the REST API server:
+
+```bash
+python3 -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+- **Interactive Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health check**: `curl http://localhost:8000/health`
+- **List discovered MCP tools**: `curl http://localhost:8000/tools`
+
+#### Example API Request
+
+```bash
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What was the total revenue in Q1 2026?"}'
+```
+
+Response:
+```json
+{
+  "question": "What was the total revenue in Q1 2026?",
+  "answer": "According to quarterly financial records, the total revenue is 16,130,000.00.",
+  "route": "sql_query",
+  "trace": [
+    {
+      "agent": "RouterAgent",
+      "action": "classify_intent",
+      "detail": "Routed to 'sql_query' (Question targets tabular numerical data (revenue, headcount, quarters, regions, database records).)"
+    },
+    {
+      "agent": "SQLAgent",
+      "action": "generate_sql",
+      "detail": "SELECT SUM(revenue) AS total_revenue FROM quarterly_revenue WHERE quarter = 'Q1-2026';"
+    },
+    {
+      "agent": "SQLAgent",
+      "action": "execute_query",
+      "detail": "Executed query successfully. 1 row(s) returned."
+    },
+    {
+      "agent": "SynthesisAgent",
+      "action": "synthesize_response",
+      "detail": "Composed grounded answer from verified tool evidence."
+    }
+  ]
+}
+```
+
+---
+
+## 🐳 Docker & Docker Compose
+
+### Run via Docker Compose
+
+```bash
+# Build and run the FastAPI service on port 8000
 docker compose up --build
+
+# Run in background (detached mode)
+docker compose up -d
 ```
 
-Or build and run directly with Docker:
+### Run via Docker CLI
 
 ```bash
+# Build image
 docker build -t agentic-doc-orchestrator .
-docker run --rm agentic-doc-orchestrator
+
+# Run container exposing port 8000
+docker run -p 8000:8000 --rm agentic-doc-orchestrator
 ```
+
+To pass an optional Anthropic API key to the container:
+```bash
+docker run -p 8000:8000 -e ANTHROPIC_API_KEY="your-api-key" --rm agentic-doc-orchestrator
+```
+
+---
+
+## Evaluation & Testing
+
+Run the automated test suite covering MCP communication, SQL safety, skill loading, and API endpoints:
+
+```bash
+python3 -m pytest tests/test_orchestrator.py -v
+```
+
+Run the 24-case intent routing benchmark:
+
+```bash
+python3 -m evaluation.eval_routing
+```
+
+Or trigger the benchmark via the REST API:
+```bash
+curl http://localhost:8000/eval
+```
+
+---
+
+## Security
+
+The SQL tool uses defensive hardening against malicious or hallucinated LLM outputs:
+1. Rejects any statement not beginning with `SELECT`.
+2. Scans the full query string for prohibited DDL/DML keywords (`DROP`, `DELETE`, `INSERT`, `UPDATE`, `ALTER`, `ATTACH`, `PRAGMA`).
+3. Rejects statement chaining (`SELECT ...; DROP ...`).
+4. Establishes the SQLite connection using URI read-only mode (`file:...sample.db?mode=ro`).
+
+Verified against adversarial attacks (`DROP TABLE quarterly_revenue`, chained `SELECT; DELETE`)—all attempts are rejected with the underlying table unmodified.

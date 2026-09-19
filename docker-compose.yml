@@ -6,9 +6,16 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: agentic_doc_orchestrator
+    ports:
+      - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
-    # Optional: pass ANTHROPIC_API_KEY from host if present
-    # environment:
-    #   - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-    restart: "no"
+      # Optional: pass ANTHROPIC_API_KEY from host if Claude LLM path is desired
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
